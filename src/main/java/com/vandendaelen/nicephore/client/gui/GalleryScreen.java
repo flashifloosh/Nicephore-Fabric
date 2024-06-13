@@ -21,6 +21,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.joml.Matrix4f;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
