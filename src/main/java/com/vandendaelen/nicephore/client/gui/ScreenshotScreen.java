@@ -10,13 +10,18 @@ import com.vandendaelen.nicephore.util.FilterListener;
 import com.vandendaelen.nicephore.util.Util;
 import me.shedaniel.autoconfig.AutoConfig;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.render.*;
 import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 import org.apache.commons.io.FileUtils;
+import org.joml.Matrix4f;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -31,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class ScreenshotScreen extends Screen {
@@ -80,7 +86,8 @@ public class ScreenshotScreen extends Screen {
     protected void init() {
         super.init();
 
-        screenshots = (ArrayList<File>) Arrays.stream(SCREENSHOTS_DIR.listFiles(config.getFilter().getPredicate())).sorted(Comparator.comparingLong(File::lastModified).reversed()).collect(Collectors.toList());
+        screenshots = (ArrayList<File>) Arrays.stream(SCREENSHOTS_DIR.listFiles(config.getFilter().getPredicate()))
+                .sorted(Comparator.comparingLong(File::lastModified).reversed()).collect(Collectors.toList());
         index = getIndex();
         aspectRatio = 1.7777F;
 
@@ -134,15 +141,15 @@ public class ScreenshotScreen extends Screen {
         MinecraftClient.getInstance().setScreen(new DeleteConfirmScreen(file, index, galleryIndex));
     }
 
-    @Override
-    public void render(MatrixStack matrixStack, int mouseX, int mouseY, float partialTicks) {
+    public void render(DrawContext context, int mouseX, int mouseY, float partialTicks) {
         int centerX = this.width / 2;
         int width = (int) (this.width * 0.5);
         int height = (int) (width / aspectRatio);
 
-        this.renderBackground(matrixStack);
+        renderBackground(context, mouseX, mouseY, partialTicks);
 
-        final var filterButton = ButtonWidget.builder(Text.translatable("nicephore.screenshot.filter", config.getFilter().name()), button -> changeFilter())
+        final var filterButton = ButtonWidget.builder(Text.translatable("nicephore.screenshot.filter", config.getFilter()
+                        .name()), button -> changeFilter())
                 .dimensions(10, 10, 100, 20)
                 .build();
 
@@ -155,8 +162,10 @@ public class ScreenshotScreen extends Screen {
         this.addDrawableChild(exitButton);
 
         if (!screenshots.isEmpty()) {
-            final var previousButton = ButtonWidget.builder(Text.of("<"), button -> modIndex(-1)).dimensions(this.width / 2 - 80, this.height / 2 + 100, 20, 20).build();
-            final var nextButton = ButtonWidget.builder(Text.of(">"), button -> modIndex(1)).dimensions(this.width / 2 + 60, this.height / 2 + 100, 20, 20).build();
+            final var previousButton = ButtonWidget.builder(Text.of("<"), button -> modIndex(-1))
+                    .dimensions(this.width / 2 - 80, this.height / 2 + 100, 20, 20).build();
+            final var nextButton = ButtonWidget.builder(Text.of(">"), button -> modIndex(1))
+                    .dimensions(this.width / 2 + 60, this.height / 2 + 100, 20, 20).build();
 
             this.addDrawableChild(previousButton);
             this.addDrawableChild(nextButton);
@@ -171,31 +180,43 @@ public class ScreenshotScreen extends Screen {
 
             copyButton.active = OperatingSystems.getOS().getManager() != null;
             if (!copyButton.active && (mouseX >= (double) copyButton.getX() && mouseY >= (double) copyButton.getY() && mouseX < (double) (copyButton.getX() + copyButton.getWidth()) && mouseY < (double) (copyButton.getY() + copyButton.getHeight()))) {
-                renderOrderedTooltip(matrixStack, client.textRenderer.wrapLines(Text.translatable("nicephore.gui.screenshots.copy.unable").formatted(Formatting.RED), 200), mouseX, mouseY);
+                List<OrderedText> orderedTexts = new ArrayList<>();
+                orderedTexts.add(Text.translatable("nicephore.gui.screenshots.copy.unable")
+                        .formatted(Formatting.RED).asOrderedText());
+                context.drawOrderedTooltip(client.textRenderer, orderedTexts, mouseX, mouseY);
             }
 
             this.addDrawableChild(copyButton);
-            this.addDrawableChild(ButtonWidget.builder(Text.translatable("nicephore.gui.screenshots.delete"), button -> deleteScreenshot(screenshots.get(index))).dimensions(this.width / 2 + 3, this.height / 2 + 75, 50, 20).build());
+            this.addDrawableChild(ButtonWidget.builder(Text.translatable("nicephore.gui.screenshots.delete"), button -> deleteScreenshot(screenshots.get(index)))
+                    .dimensions(this.width / 2 + 3, this.height / 2 + 75, 50, 20).build());
         }
 
         if (screenshots.isEmpty()) {
-            drawCenteredText(matrixStack, MinecraftClient.getInstance().textRenderer, Text.translatable("nicephore.screenshots.empty"), centerX, 20, Color.RED.getRGB());
+            context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer, Text.translatable("nicephore.screenshots.empty"), centerX, 20, Color.RED.getRGB());
         } else {
             final File currentScreenshot = screenshots.get(index);
             if (currentScreenshot.exists()) {
                 RenderSystem.setShaderTexture(0, SCREENSHOT_TEXTURE.getGlId());
                 RenderSystem.enableBlend();
-                drawTexture(matrixStack, centerX - width / 2, 50, 0, 0, width, height, width, height);
+                RenderSystem.setShader(GameRenderer::getPositionTexProgram);
+                Matrix4f matrix4f = context.getMatrices().peek().getPositionMatrix();
+                BufferBuilder bufferBuilder = Tessellator.getInstance().getBuffer();
+                bufferBuilder.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+                bufferBuilder.vertex(matrix4f, centerX - width / 2, 50, 0.001f).texture(0, 0).next();
+                bufferBuilder.vertex(matrix4f, centerX - width / 2, 50 + height, 0.001f).texture(0, 1).next();
+                bufferBuilder.vertex(matrix4f, centerX + width / 2, 50 + height, 0.001f).texture(1, 1).next();
+                bufferBuilder.vertex(matrix4f, centerX + width / 2, 50, 0.001f).texture(1, 0).next();
+                BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
                 RenderSystem.disableBlend();
 
-                drawCenteredText(matrixStack, MinecraftClient.getInstance().textRenderer, Text.translatable("nicephore.gui.screenshots.pages", index + 1, screenshots.size()), centerX, 20, Color.WHITE.getRGB());
-                drawCenteredText(matrixStack, MinecraftClient.getInstance().textRenderer, Text.of(MessageFormat.format("{0} ({1})", currentScreenshot.getName(), getFileSizeMegaBytes(currentScreenshot))), centerX, 35, Color.WHITE.getRGB());
+                context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer, Text.translatable("nicephore.gui.screenshots.pages", index + 1, screenshots.size()), centerX, 20, Color.WHITE.getRGB());
+                context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer, Text.of(MessageFormat.format("{0} ({1})", currentScreenshot.getName(), getFileSizeMegaBytes(currentScreenshot))), centerX, 35, Color.WHITE.getRGB());
             } else {
                 closeScreen("nicephore.screenshots.loading.error");
             }
         }
 
-        super.render(matrixStack, mouseX, mouseY, partialTicks);
+        super.render(context, mouseX, mouseY, partialTicks);
     }
 
     private void modIndex(int value) {

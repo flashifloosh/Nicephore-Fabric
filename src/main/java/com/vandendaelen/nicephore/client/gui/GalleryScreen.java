@@ -8,11 +8,17 @@ import com.vandendaelen.nicephore.util.FilterListener;
 import com.vandendaelen.nicephore.util.Util;
 import me.shedaniel.autoconfig.AutoConfig;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.render.*;
+import net.minecraft.client.texture.GuiAtlasManager;
 import net.minecraft.client.texture.NativeImageBackedTexture;
+import net.minecraft.client.texture.Scaling;
+import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -61,8 +67,10 @@ public class GalleryScreen extends Screen implements FilterListener {
     protected void init() {
         super.init();
 
-        screenshots = (ArrayList<File>) Arrays.stream(SCREENSHOTS_DIR.listFiles(config.getFilter().getPredicate())).sorted(Comparator.comparingLong(File::lastModified).reversed()).collect(Collectors.toList());
-        pagesOfScreenshots = (ArrayList<List<File>>) Util.batches(screenshots, IMAGES_TO_DISPLAY).collect(Collectors.toList());
+        screenshots = (ArrayList<File>) Arrays.stream(SCREENSHOTS_DIR.listFiles(config.getFilter().getPredicate()))
+                .sorted(Comparator.comparingLong(File::lastModified).reversed()).collect(Collectors.toList());
+        pagesOfScreenshots = (ArrayList<List<File>>) Util.batches(screenshots, IMAGES_TO_DISPLAY)
+                .collect(Collectors.toList());
         index = getIndex();
         aspectRatio = 1.7777F;
 
@@ -101,15 +109,15 @@ public class GalleryScreen extends Screen implements FilterListener {
         init();
     }
 
-    @Override
-    public void render(MatrixStack matrixStack, int mouseX, int mouseY, float partialTicks) {
+    public void render(DrawContext context, int mouseX, int mouseY, float partialTicks) {
         final int centerX = this.width / 2;
         final int imageWidth = (int) (this.width * 1.0 / 5);
         final int imageHeight = (int) (imageWidth / aspectRatio);
 
-        this.renderBackground(matrixStack);
+        renderBackground(context, mouseX, mouseY, partialTicks);
 
-        final var filterButton = ButtonWidget.builder(Text.translatable("nicephore.screenshot.filter", config.getFilter().name()), button -> changeFilter())
+        final var filterButton = ButtonWidget.builder(Text.translatable("nicephore.screenshot.filter", config.getFilter()
+                        .name()), button -> changeFilter())
                 .dimensions(10, 10, 100, 20)
                 .build();
 
@@ -122,15 +130,17 @@ public class GalleryScreen extends Screen implements FilterListener {
         this.addDrawableChild(exitButton);
 
         if (!screenshots.isEmpty()) {
-            final var previousButton = ButtonWidget.builder(Text.of("<"), button -> modIndex(-1)).dimensions(this.width / 2 - 80, this.height / 2 + 100, 20, 20).build();
-            final var nextButton = ButtonWidget.builder(Text.of(">"), button -> modIndex(1)).dimensions(this.width / 2 + 60, this.height / 2 + 100, 20, 20).build();
+            final var previousButton = ButtonWidget.builder(Text.of("<"), button -> modIndex(-1))
+                    .dimensions(this.width / 2 - 80, this.height / 2 + 100, 20, 20).build();
+            final var nextButton = ButtonWidget.builder(Text.of(">"), button -> modIndex(1))
+                    .dimensions(this.width / 2 + 60, this.height / 2 + 100, 20, 20).build();
 
             this.addDrawableChild(previousButton);
             this.addDrawableChild(nextButton);
         }
 
         if (pagesOfScreenshots.isEmpty()) {
-            drawCenteredText(matrixStack, MinecraftClient.getInstance().textRenderer, Text.translatable("nicephore.screenshots.empty"), centerX, 20, Color.RED.getRGB());
+            context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer, Text.translatable("nicephore.screenshots.empty"), centerX, 20, Color.RED.getRGB());
         } else {
             final List<File> currentPage = pagesOfScreenshots.get(index);
             if (currentPage.stream().allMatch(File::exists)) {
@@ -142,28 +152,36 @@ public class GalleryScreen extends Screen implements FilterListener {
                     int x = centerX - (15 - (imageIndex % 4) * 10) - (2 - (imageIndex % 4)) * imageWidth;
                     int y = 50 + (imageIndex / 4 * (imageHeight + 30));
 
+                    /* render billboard */
                     RenderSystem.setShaderTexture(0, TEXTURE.getGlId());
                     RenderSystem.enableBlend();
-                    drawTexture(matrixStack, x, y, 0, 0, imageWidth, imageHeight, imageWidth, imageHeight);
+                    RenderSystem.setShader(GameRenderer::getPositionTexProgram);
+                    Matrix4f matrix4f = context.getMatrices().peek().getPositionMatrix();
+                    BufferBuilder bufferBuilder = Tessellator.getInstance().getBuffer();
+                    bufferBuilder.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+                    bufferBuilder.vertex(matrix4f, x, y, 0.001f).texture(0, 0).next();
+                    bufferBuilder.vertex(matrix4f, x, y + imageHeight, 0.001f).texture(0, 1).next();
+                    bufferBuilder.vertex(matrix4f, x + imageWidth, y + imageHeight, 0.001f).texture(1, 1).next();
+                    bufferBuilder.vertex(matrix4f, x + imageWidth, y, 0.001f).texture(1, 0).next();
+                    BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
                     RenderSystem.disableBlend();
 
-                    drawExtensionBadge(matrixStack, FilenameUtils.getExtension(name), x - 10, y + 14);
-
-                    var openImageButton = ButtonWidget.builder(text, button -> openScreenshotScreen(screenshots.indexOf(currentPage.get(imageIndex)))).dimensions(x, y + 5 + imageHeight, imageWidth, 20).build();
+                    drawExtensionBadge(context, FilenameUtils.getExtension(name), x - 10, y + 14);
+                    var openImageButton = ButtonWidget.builder(text, button -> openScreenshotScreen(screenshots.indexOf(currentPage.get(imageIndex))))
+                            .dimensions(x, y + 5 + imageHeight, imageWidth, 20).build();
 
                     this.addDrawableChild(openImageButton);
                 });
 
-                drawCenteredText(matrixStack, MinecraftClient.getInstance().textRenderer, Text.translatable("nicephore.gui.gallery.pages", index + 1, pagesOfScreenshots.size()), centerX, this.height / 2 + 105, Color.WHITE.getRGB());
+                context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer, Text.translatable("nicephore.gui.gallery.pages", index + 1, pagesOfScreenshots.size()), centerX, this.height / 2 + 105, Color.WHITE.getRGB());
             }
         }
-
-        super.render(matrixStack, mouseX, mouseY, partialTicks);
+        super.render(context, mouseX, mouseY, partialTicks);
     }
 
-    private void drawExtensionBadge(MatrixStack matrixStack, String extension, int x, int y) {
+    private void drawExtensionBadge(DrawContext context, String extension, int x, int y) {
         if (config.getFilter() == ScreenshotFilter.BOTH) {
-            drawTextWithShadow(matrixStack, MinecraftClient.getInstance().textRenderer, Text.of(extension.toUpperCase()), x + 12, y - 12, Color.WHITE.getRGB());
+            context.drawTextWithShadow(MinecraftClient.getInstance().textRenderer, Text.of(extension.toUpperCase()), x + 12, y - 12, Color.WHITE.getRGB());
         }
     }
 
