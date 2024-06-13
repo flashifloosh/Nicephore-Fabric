@@ -146,7 +146,7 @@ public class ScreenshotScreen extends Screen {
         int width = (int) (this.width * 0.5);
         int height = (int) (width / aspectRatio);
 
-        renderBackground(context, mouseX, mouseY, partialTicks);
+        renderBackground(context);
 
         final var filterButton = ButtonWidget.builder(Text.translatable("nicephore.screenshot.filter", config.getFilter()
                         .name()), button -> changeFilter())

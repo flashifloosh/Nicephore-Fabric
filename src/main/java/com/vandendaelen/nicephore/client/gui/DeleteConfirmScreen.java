@@ -53,7 +53,7 @@ public class DeleteConfirmScreen extends Screen {
     }
 
     public void render(DrawContext context, int mouseX, int mouseY, float partialTicks) {
-        renderBackground(context, mouseX, mouseY, partialTicks);
+        renderBackground(context);
         super.render(context, mouseX, mouseY, partialTicks);
         context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer, Text.translatable("nicephore.gui.delete.question", file.getName())
                 .getString(), this.width / 2, this.height / 2 - 20, Color.RED.getRGB());

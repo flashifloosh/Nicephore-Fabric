@@ -12,13 +12,8 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.render.*;
-import net.minecraft.client.texture.GuiAtlasManager;
 import net.minecraft.client.texture.NativeImageBackedTexture;
-import net.minecraft.client.texture.Scaling;
-import net.minecraft.client.texture.Sprite;
-import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joml.Matrix4f;
@@ -115,7 +110,7 @@ public class GalleryScreen extends Screen implements FilterListener {
         final int imageWidth = (int) (this.width * 1.0 / 5);
         final int imageHeight = (int) (imageWidth / aspectRatio);
 
-        renderBackground(context, mouseX, mouseY, partialTicks);
+        renderBackground(context);
 
         final var filterButton = ButtonWidget.builder(Text.translatable("nicephore.screenshot.filter", config.getFilter()
                         .name()), button -> changeFilter())
