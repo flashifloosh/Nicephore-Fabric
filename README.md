@@ -8,15 +8,11 @@ Nicephore is a Minecraft mod which convert any screenshot taken to JPEG, iproves
 
 Requirements: [Fabric Loader](https://fabricmc.net/use/)
 
-### 1. Via CurseForge:
- 
-[![](https://cf.way2muchnoise.eu/full_nicephore-fabric_downloads%20on%20CurseForge.svg?badge_style=round)](https://www.curseforge.com/minecraft/mc-mods/nicephore-fabric)
-
-### 2. Compiling the source code
+### Compiling the source code
 You have to follow the steps below:
 - Clone the repository with:
 ```
-git clone https://github.com/LotuxPunk/Nicephore-Fabric
+git clone https://github.com/flashifloosh/Nicephore-Fabric
 ```
 - After this is done, enter the folder created and run:
 ```
@@ -25,14 +21,14 @@ git clone https://github.com/LotuxPunk/Nicephore-Fabric
 - Then head to the `libs` folder, grab the `.jar` file and place it into your `mods` folder.
 
 
-## Contributing
+## Notice
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+This is a fork of the Nicephore-fabric project by [@LotuxPunk](https://github.com/LotuxPunk).
 
-Please make sure to update tests as appropriate.
+[To the original](https://github.com/LotuxPunk/Nicephore-Fabric)
 
 ## Feedback/Support
-You can use the [Issues section](https://github.com/LotuxPunk/Nicephore-Fabric/issues) to report bugs or give feedback.
+You can use the [Issues section](https://github.com/flashifloosh/Nicephore-Fabric/issues) to report bugs or give feedback.
 
 ## License
-This mod is licensed under the [MIT License](LICENSE).
+The original project is licensed under the [MIT License](LICENSE).
